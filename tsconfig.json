@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "lib": ["ES2021.String", "DOM"]
+  },
+  "extends": "@motion-canvas/2d/tsconfig.project.json",
+  "include": ["src"]
+}
