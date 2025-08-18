@@ -19,8 +19,6 @@ import {
   Node,
   Path,
   Polygon,
-  Ray,
-  Rect,
   SVG,
   Txt,
 } from '@motion-canvas/2d'
@@ -39,7 +37,6 @@ import * as THREE from 'three'
 import { ShikiHighlighter } from '../components/Shiki'
 import { math, Pitex } from '../components/Pitex'
 import {
-  createSignal,
   easeInCubic,
   easeInExpo,
   easeInOutCubic,
@@ -177,169 +174,193 @@ export default makeScene2D(function* (view) {
     lineJoin: 'round' as CanvasLineJoin,
   }
 
-  let a = createSignal(400)
-  let b = createSignal(300)
+  const origin = [
+    [0, 0],
+    [0, 0],
+    [0, 0],
+    [0, 0],
+  ] as PossibleVector2[]
 
-  let theta = createSignal(60)
-  let phi = createSignal(70)
+  const quad = new Line({
+    points: origin,
+    stroke: 'white',
+    lineWidth: 8,
+    ...preset,
+  })
+
+  let a = 400
+  let b = 300
+
+  let theta = 60
+  let phi = 70
 
   function compute() {
     const points: [number, number][] = []
-    points[0] = [a(), 0]
-    points[1] = [b() * cos(theta()), b() * sin(theta())]
-    points[2] = [a() * cos(theta() + phi()), a() * sin(theta() + phi())]
-    points[3] = [b() * cos(180 + phi()), b() * sin(180 + phi())]
+    points[0] = [a, 0]
+    points[1] = [b * cos(theta), b * sin(theta)]
+    points[2] = [a * cos(theta + phi), a * sin(theta + phi)]
+    points[3] = [b * cos(180 + phi), b * sin(180 + phi)]
+    points[4] = points[0]
     return points
   }
 
+  view.add(quad)
+
   const txtProps = {
     fill: 'white',
-    fontSize: 48,
-    fontFamily: 'Poppins',
+    fontSize: 64,
   }
 
-  function vertex(text: string, i: number) {
-    return new Rect({
-      size: 64,
-      radius: 32,
-      fill: 'black',
-      stroke: 'white',
-      lineWidth: 8,
-      scale: 0,
-      position: () => compute()[i],
-    }).add(
-      new Txt({
-        text,
-        ...txtProps,
-      })
-    )
-  }
+  const letters = [
+    new Txt({
+      text: 'A',
+      ...txtProps,
+    }),
+    new Txt({
+      text: 'B',
+      ...txtProps,
+    }),
+    new Txt({
+      text: 'C',
+      ...txtProps,
+    }),
+    new Txt({
+      text: 'D',
+      ...txtProps,
+    }),
+  ]
 
-  function edge(i: number) {
-    return new Ray({
-      stroke: 'white',
-      lineWidth: 8,
-      from: () => vertices[i].position(),
-      to: () => vertices[(i + 1) % vertices.length].position(),
-      ...preset,
-    })
-  }
-
-  function wire(i: number) {
-    return new Ray({
-      stroke: 'white',
-      lineWidth: 8,
-      to: () => vertices[i].position(),
-      ...preset,
-    })
-  }
-
-  function cycle(
-    items: Node[],
-    callback: (a: Node, b: Node, index: number) => void
-  ) {
-    for (let index = 0; index < items.length; index++) {
-      const a = items[index]
-      const b = items[(index + 1) % items.length]
-      callback(a, b, index)
-    }
-  }
+  quad.points(compute())
 
   const group = new Node({})
 
-  const vertices = ['A', 'B', 'C', 'D'].map((lbl, i) => vertex(lbl, i))
-  
-  const edges = vertices.map((_, i) => edge(i))
-
-  vertices.forEach((v, i) => {
-    v.zIndex(1)
-    group.add(v)
-  })
-  
-  edges.forEach((e, i) => {
-    e.end(0)
-    group.add(e)
+  letters.forEach((letter, i) => {
+    group.add(letter)
+    letter.opacity(0).position([quad.parsedPoints()[i].x - 40, quad.parsedPoints()[i].y - 80])
   })
 
   view.add(group)
-  
-  yield* all(...vertices.map((v) => v.scale(1, 0.5)))
-  yield* all(...edges.map((e) => e.end(1, 0.5)))
-  
-  const o = new Rect({
-    size: 64,
-    radius: 32,
-    fill: 'black',
-    stroke: 'white',
-    lineWidth: 8,
-    scale: 0,
-    zIndex: 1,
-  }).add(
-    new Txt({
-      text: 'O',
-      ...txtProps,
-    })
+
+  quad.points(origin)
+
+  yield* all(
+    quad.points(compute(), 1),
+    ...letters.map((letter) => letter.opacity(1, 1))
   )
-  group.add(o)
-  
-  yield* o.scale(1, 1)
-  
-  const wires = vertices.map((_, i) => wire(i))
-  
-  wires.forEach((w, i) => {
-    w.end(0)
-    group.add(w)
+
+  const pt = new Circle({
+    size: 16,
+    fill: 'white',
   })
 
-  
-  yield* all(
-    theta(90, 1),
-    group.rotation(-30, 1),
-    ...vertices.map(v => v.childAs<Txt>(0).rotation(30, 1))
-  )
+  pt.scale(0)
+
+  view.add(pt)
 
   yield* all(
-    ...wires.map((w, i) =>
-      delay(
-        (i % 2) / 2,
-        all(
-          w.lineWidth(8, 0.5),
-          w.end(1, 0.5),
-          i % 2 ? w.stroke('#007bff', 0.5) : w.stroke('#ff4040', 0.5)
-        )
-      )
+    chain(
+      tween(1, (t) => {
+        phi = easeInOutCubic(t, 70, 50)
+        quad.points(compute())
+        letters.forEach((letter, i) => letter.position([quad.parsedPoints()[i].x - 40, quad.parsedPoints()[i].y - 80]))
+      }),
+      tween(1, (t) => {
+        theta = easeInOutCubic(t, 60, 100)
+        quad.points(compute())
+        letters.forEach((letter, i) => letter.position([quad.parsedPoints()[i].x - 40, quad.parsedPoints()[i].y - 80]))
+      })
     ),
-    a(300, 1),
-    b(450, 1),
+    quad.rotation(-30, 2, easeInOutCubic),
+    group.rotation(-30, 2, easeInOutCubic),
+    ...letters.map(letter => letter.rotation(30, 2)),
+    delay(1, pt.scale(1, 1))
   )
 
-  yield* theta(80, 1),
+  const lines = [
+    new Line({
+      points: [
+        [0, 0],
+        [0, 0],
+      ],
+      stroke: '#69C3FF',
+      ...preset,
+    }),
+    new Line({
+      points: [
+        [0, 0],
+        [0, 0],
+      ],
+      stroke: '#FF738A',
+      ...preset,
+    }),
+    new Line({
+      points: [
+        [0, 0],
+        [0, 0],
+      ],
+      stroke: '#69C3FF',
+      ...preset,
+    }),
+    new Line({
+      points: [
+        [0, 0],
+        [0, 0],
+      ],
+      stroke: '#FF738A',
+      ...preset,
+    }),
+  ]
+
+  const net = new Node({})
+
+  lines.forEach((line) => net.add(line))
+
+  view.add(net)
+
   yield* all(
-    b(300, 1),
-    a(400, 1),
+    pt.size(8, 1),
+    ...letters.map(letter => letter.opacity(0, 1)),
+    ...lines.map((line, i) =>
+      delay(i * 0.1, line.points([[0, 0], quad.points()[i]], 1))
+    ),
+    ...lines.map((line, i) => delay(i * 0.1, line.lineWidth(8, 1))),
+    net.rotation(-30, 1),
   )
+
+  yield* waitFor(2.5)
+
+  const abo = new Line({
+    points: [
+      [0, 0],
+      quad.points()[0],
+      quad.points()[1],
+      [0, 0]
+    ]
+  })
+
+  const cdo = new Line({
+    points: [
+      [0, 0],
+      quad.points()[2],
+      quad.points()[3],
+      [0, 0]
+    ]
+  })
+
+  abo.rotation(-30)
+  cdo.rotation(-30)
+
+  view.add(abo)
 
   yield* all(
-    ...wires.map(w => w.stroke('white', 1))
+    abo.fill('white', 1),
+    pt.size(0, 1),
+    ...lines.map(line => line.lineWidth(0, 1))
   )
 
-  yield* chain(
-    vertices[0].stroke('#007bff', 0.1),
-    edges[0].stroke('#007bff', 0.1),
-    vertices[1].stroke('#007bff', 0.1),
-    wires[1].stroke('#007bff', 0.1),
-    o.stroke('#007bff', 0.1),
-    wires[0].stroke('#007bff', 0.1),
-  )
+  view.add(cdo)
 
-  yield* chain(
-    vertices[2].stroke('#ff4040', 0.1),
-    edges[2].stroke('#ff4040', 0.1),
-    vertices[3].stroke('#ff4040', 0.1),
-    wires[3].stroke('#ff4040', 0.1),
-    o.stroke('#c83effff', 0.1),
-    wires[2].stroke('#ff4040', 0.1),
-  )
+  yield* cdo.fill('white', 1)
 
-  yield* waitFor(1)
+  // yield* waitFor(10)
 })
