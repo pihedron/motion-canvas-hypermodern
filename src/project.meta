@@ -10,7 +10,7 @@
       "x": 1920,
       "y": 1080
     },
-    "audioOffset": -413
+    "audioOffset": -220
   },
   "preview": {
     "fps": 30,
@@ -23,7 +23,7 @@
     "exporter": {
       "name": "@motion-canvas/ffmpeg",
       "options": {
-        "fastStart": true,
+        "fastStart": false,
         "includeAudio": true
       }
     }

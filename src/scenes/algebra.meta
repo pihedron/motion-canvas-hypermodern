@@ -1,0 +1,14 @@
+{
+  "version": 0,
+  "timeEvents": [
+    {
+      "name": "trig",
+      "targetTime": 6.645480528760273
+    },
+    {
+      "name": "next",
+      "targetTime": 37.9577081100393
+    }
+  ],
+  "seed": 375842941
+}

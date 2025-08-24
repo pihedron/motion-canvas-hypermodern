@@ -21,16 +21,20 @@ import {
   Polygon,
   Ray,
   Rect,
+  Spline,
   SVG,
   Txt,
 } from '@motion-canvas/2d'
 import {
   all,
+  any,
   chain,
   delay,
   waitFor,
   waitUntil,
 } from '@motion-canvas/core/lib/flow'
+
+import { LinePlot, Plot } from '@hhenrichsen/motion-canvas-graphing'
 
 // three.js integration
 import * as THREE from 'three'
@@ -39,10 +43,12 @@ import * as THREE from 'three'
 import { ShikiHighlighter } from '../components/Shiki'
 import { math, Pitex } from '../components/Pitex'
 import {
+  Color,
   createSignal,
   easeInCubic,
   easeInExpo,
   easeInOutCubic,
+  easeOutBounce,
   easeOutCubic,
   map,
   PossibleVector2,
@@ -55,13 +61,16 @@ import '../global.css'
 
 // SVG
 import geosvg from '../geometry.svg?raw'
+import oversvg from '../overcomplicate.svg?raw'
 import { draw } from '../functions/draw'
+import { ShaderBackground } from '../components/ShaderBackground'
+import { Spletters } from '../components/Spletters'
 
 // a better code highlighter
-const dart = new ShikiHighlighter({
+const highlighter = new ShikiHighlighter({
   highlighter: {
-    lang: 'dart', // more languages supported than lezer
-    theme: 'github-dark', // you can now choose themes
+    lang: 'python', // more languages supported than lezer
+    theme: 'vitesse-black', // you can now choose themes
   },
 })
 
@@ -82,264 +91,177 @@ function title(text: string) {
   })
 }
 
+const OFFWHITE = '#fcf1c9'
+const preset = {
+  fontFamily: 'Poppins',
+  fontSize: 64,
+  fill: OFFWHITE,
+}
+
 export default makeScene2D(function* (view) {
-  const txt = title('Geometry')
-  txt.fontSize(128).scale(0).stroke('white')
-
-  // #region 3d
-
-  const { x: width, y: height } = useScene2D().getSize()
-
-  const camera = new THREE.PerspectiveCamera()
-  const scene = new THREE.Scene()
-
-  const icogeo = new THREE.IcosahedronGeometry(1, 0)
-  const tetrageo = new THREE.TetrahedronGeometry(1, 0)
-  const material = new THREE.MeshPhongMaterial({
-    color: 0xffffff,
-    flatShading: true,
+  const bg = new Rect({
+    width: view.width(),
+    height: view.height(),
+    fill: '#10141c',
+    zIndex: -10
   })
 
-  const ico = new Pihedron(icogeo, material)
-  ico.position.set(4.5, -2.5, 0)
-  scene.add(ico)
+  view.add(bg.opacity(0))
 
-  const tetra = new Pihedron(tetrageo, material)
-  tetra.position.set(-4.5, 2.5, 0)
-  scene.add(tetra)
+  const algebra = new Spletters({})
+  algebra.edit('Algebra', { ...preset, fontSize: 128 })
+  view.add(algebra)
 
-  const color = 0xffffff
-  const intensity = 1
-  const light = new THREE.AmbientLight(color, intensity)
-  scene.add(light)
+  yield* bg.opacity(1, 0.5)
 
-  const pl = new THREE.PointLight(color, 1)
-  pl.position.y = 2
-  scene.add(pl)
+  yield* algebra.show(1)
+  yield* waitUntil('problem')
+  yield* algebra.hide(1)
 
-  const dl = new THREE.DirectionalLight(color, 2)
-  dl.position.x = -2
-  scene.add(dl)
+  yield* waitUntil('forming')
 
-  camera.position.set(0, 0, 4)
+  const ptx = new Pitex({
+    fill: OFFWHITE,
+    fontSize: 64,
+    tex: math('y = m x + c'),
+  })
 
-  const v = new Three({ camera, scene, width, height })
+  view.add(ptx)
 
-  // #endregion
+  const code = new Code({ highlighter })
 
-  view.add(v)
-  view.add(txt)
+  code.y(200).offset([0, -1])
+  view.add(code)
 
+  yield* ptx.write(1)
+  yield* all(ptx.edit('y - c = m x', 1), code.code('translate([0, c])', 1))
   yield* all(
-    chain(
-      all(txt.scale(1, 1), delay(1, txt.rotation(-10, 0.5, easeInCubic))),
-      txt.rotation(0, 0.5, easeOutCubic)
-    ),
-    ico.pos([3, -1, 0], 2),
-    ico.rot([0, tau / 2, 0], 2),
-    tetra.pos([-3, 1, 0], 2),
-    tetra.rot([0, tau * 1.1, tau * 0.1], 2)
+    ptx.edit('{{ y - c }/over{ m }} = x', 1),
+    code.code('scale([1, m])\ntranslate([0, c])', 1)
   )
 
-  const circle = new Circle({
-    fill: 'white',
-  })
-  const svg = new SVG({
-    svg: geosvg,
-    compositeOperation: 'source-in',
-  })
+  yield* waitFor(0.5)
 
-  view.add(new Node({ cache: true }).add(circle).add(svg))
+  yield* all(ptx.unwrite(1), code.opacity(0, 1))
 
-  yield* all(
-    chain(
-      all(delay(0.5, circle.size(800, 1)), draw(svg, 0.2), txt.opacity(0, 1)),
-      waitFor(1),
-      circle.size(0, 1)
-    ),
-    tween(3, (t) => {
-      t = easeInOutCubic(t)
-      camera.position.z = map(4, 7, t)
-      ico.rotation.y = map(0, tau, t)
-      tetra.rotation.y = map(tau * 1.1, 0, t)
-    })
-  )
-
-  svg.remove()
-
-  yield* tween(1, (t) => {
-    t = easeInExpo(t)
-    camera.rotation.x = map(0, tau / 4, t)
-  })
-
-  const preset = {
-    lineCap: 'round' as CanvasLineCap,
-    lineJoin: 'round' as CanvasLineJoin,
-  }
-
-  let a = createSignal(400)
-  let b = createSignal(300)
-
-  let theta = createSignal(60)
-  let phi = createSignal(70)
-
-  function compute() {
-    const points: [number, number][] = []
-    points[0] = [a(), 0]
-    points[1] = [b() * cos(theta()), b() * sin(theta())]
-    points[2] = [a() * cos(theta() + phi()), a() * sin(theta() + phi())]
-    points[3] = [b() * cos(180 + phi()), b() * sin(180 + phi())]
-    return points
-  }
-
-  const txtProps = {
-    fill: 'white',
-    fontSize: 48,
+  const plot = new Plot({
+    clip: true,
+    size: [960, 540],
+    labelSize: 0,
+    tickLabelSize: 24,
     fontFamily: 'Poppins',
-  }
-
-  function vertex(text: string, i: number) {
-    return new Rect({
-      size: 64,
-      radius: 32,
-      fill: 'black',
-      stroke: 'white',
-      lineWidth: 8,
-      scale: 0,
-      position: () => compute()[i],
-    }).add(
-      new Txt({
-        text,
-        ...txtProps,
-      })
-    )
-  }
-
-  function edge(i: number) {
-    return new Ray({
-      stroke: 'white',
-      lineWidth: 8,
-      from: () => vertices[i].position(),
-      to: () => vertices[(i + 1) % vertices.length].position(),
-      ...preset,
-    })
-  }
-
-  function wire(i: number) {
-    return new Ray({
-      stroke: 'white',
-      lineWidth: 8,
-      to: () => vertices[i].position(),
-      ...preset,
-    })
-  }
-
-  function cycle(
-    items: Node[],
-    callback: (a: Node, b: Node, index: number) => void
-  ) {
-    for (let index = 0; index < items.length; index++) {
-      const a = items[index]
-      const b = items[(index + 1) % items.length]
-      callback(a, b, index)
-    }
-  }
-
-  const group = new Node({})
-
-  const vertices = ['A', 'B', 'C', 'D'].map((lbl, i) => vertex(lbl, i))
-  
-  const edges = vertices.map((_, i) => edge(i))
-
-  vertices.forEach((v, i) => {
-    v.zIndex(1)
-    group.add(v)
-  })
-  
-  edges.forEach((e, i) => {
-    e.end(0)
-    group.add(e)
+    minX: -8,
+    maxX: 8,
+    minY: 0,
+    maxY: 9,
+    ticks: [16, 9],
   })
 
-  view.add(group)
-  
-  yield* all(...vertices.map((v) => v.scale(1, 0.5)))
-  yield* all(...edges.map((e) => e.end(1, 0.5)))
-  
-  const o = new Rect({
-    size: 64,
-    radius: 32,
-    fill: 'black',
-    stroke: 'white',
-    lineWidth: 8,
-    scale: 0,
-    zIndex: 1,
-  }).add(
-    new Txt({
-      text: 'O',
-      ...txtProps,
-    })
-  )
-  group.add(o)
-  
-  yield* o.scale(1, 1)
-  
-  const wires = vertices.map((_, i) => wire(i))
-  
-  wires.forEach((w, i) => {
-    w.end(0)
-    group.add(w)
+  const line = new LinePlot({
+    lineWidth: 4,
+    stroke: '#e2463bff',
   })
 
-  
-  yield* all(
-    theta(90, 1),
-    group.rotation(-30, 1),
-    ...vertices.map(v => v.childAs<Txt>(0).rotation(30, 1))
-  )
+  view.add(plot.add(line))
 
-  yield* all(
-    ...wires.map((w, i) =>
-      delay(
-        (i % 2) / 2,
-        all(
-          w.lineWidth(8, 0.5),
-          w.end(1, 0.5),
-          i % 2 ? w.stroke('#007bff', 0.5) : w.stroke('#ff4040', 0.5)
-        )
-      )
-    ),
-    a(300, 1),
-    b(450, 1),
-  )
+  plot.opacity(0)
+  line
+    .data(plot.makeGraphData(0.1, (x) => Math.pow(x, 2)))
+    .lineWidth(8)
+    .end(0)
 
-  yield* theta(80, 1),
-  yield* all(
-    b(300, 1),
-    a(400, 1),
-  )
+  yield* all(plot.opacity(1, 1), line.end(1, 1))
 
-  yield* all(
-    ...wires.map(w => w.stroke('white', 1))
-  )
+  yield* waitUntil('you')
 
-  yield* chain(
-    vertices[0].stroke('#007bff', 0.1),
-    edges[0].stroke('#007bff', 0.1),
-    vertices[1].stroke('#007bff', 0.1),
-    wires[1].stroke('#007bff', 0.1),
-    o.stroke('#007bff', 0.1),
-    wires[0].stroke('#007bff', 0.1),
-  )
-
-  yield* chain(
-    vertices[2].stroke('#ff4040', 0.1),
-    edges[2].stroke('#ff4040', 0.1),
-    vertices[3].stroke('#ff4040', 0.1),
-    wires[3].stroke('#ff4040', 0.1),
-    o.stroke('#c83effff', 0.1),
-    wires[2].stroke('#ff4040', 0.1),
-  )
+  yield* plot.scale([1, 0], 1)
 
   yield* waitFor(1)
+
+  ptx.tex(math('/cos{x}=/min(y, 0)'))
+
+  yield* ptx.write(3)
+
+  yield* waitFor(2)
+
+  function range(start: number, end: number, step: number) {
+    const nums = []
+    for (let i = start; i < end; i += step) {
+      nums.push(i)
+    }
+    return nums
+  }
+
+  const style = {
+    end: 0,
+    stroke: OFFWHITE,
+    lineWidth: 4,
+    lineCap: 'round' as CanvasLineCap,
+    opacity: 0,
+    zIndex: -2
+  }
+
+  const dim = new Rect({
+    fill: bg.fill(),
+    opacity: 0,
+    width: view.width(),
+    height: view.height(),
+    zIndex: -1
+  })
+
+  view.add(dim)
+
+  const verts = range(-960, 960, 120).map(
+    (n) => new Ray({ from: [n, -540], to: [n, 540], ...style })
+  )
+  const horis = range(-540, 540, 120).map(
+    (n) => new Ray({ from: [-960, n], to: [960, n], ...style })
+  )
+
+  verts.forEach((ray) => view.add(ray))
+  horis.forEach((ray) => view.add(ray))
+
+  yield* all(...verts.map((ray, i) => delay(i * 0.1, all(ray.end(1, 1), ray.opacity(1, 0.5)))), dim.opacity(0.75, 0.5))
+  yield* all(...horis.map((ray, i) => delay(i * 0.1, all(ray.end(1, 1), ray.opacity(1, 0.5)))))
+
+  yield* all(
+    ...verts.map(ray => all(ray.rotation(45, 1), ray.scale(2, 1))),
+    ...horis.map(ray => all(ray.rotation(15, 1), ray.scale(2, 1)))
+  )
+
+  yield* any(...verts.map((ray, i) => ray.end(0, 0.5)), ptx.opacity(0, 1))
+  yield* all(...horis.map((ray, i) => ray.end(0, 0.5)))
+
+  verts.forEach(ray => ray.remove())
+  horis.forEach(ray => ray.remove())
+
+  const txt = range(0, 3, 1).map(x => new Spletters({}))
+
+  const input = [
+    'Reflect the graph across the x-axis.',
+    'Translate the graph upwards by 1 unit.',
+    'Stretch the graph along the x-axis by a factor of 2.'
+  ].forEach((text, i) => {
+    txt[i].edit(text, preset)
+    view.add(txt[i])
+  })
+  
+  yield* txt[0].show(1)
+  yield* waitFor(1)
+  yield* txt[0].y(-50, 1)
+  txt[1].y(50)
+  yield* all(
+    txt[1].show(1)
+  )
+  yield* waitFor(1)
+  yield* all(
+    txt[0].y(-100, 1),
+    txt[1].y(0, 1),
+  )
+  txt[2].y(100)
+  yield* txt[2].show(1)
+  yield* waitFor(3)
+  yield* all(
+    ...txt.map(t => t.hide(1))
+  )
 })

@@ -1,4 +1,4 @@
-import { CanvasStyle, Latex, LatexProps, Path } from '@motion-canvas/2d'
+import { CanvasStyle, Latex, LatexProps, Path, Rect } from '@motion-canvas/2d'
 import { all, delay, TimingFunction, tween } from '@motion-canvas/core'
 
 const factor = 2
@@ -6,6 +6,10 @@ const buffer = 0.25
 
 export function math(tex: string) {
   return tex.replaceAll('/', '\\').split(' ')
+}
+
+export function isPath(path: Path | Rect) {
+  return 'data' in path
 }
 
 export interface PitexProps extends LatexProps {}
@@ -24,7 +28,7 @@ export class Pitex extends Latex {
       .children()
       .flatMap((part) =>
         part.children().length ? (part.children() as Path[]) : part
-      ) as Path[]
+      ) as (Path | Rect)[]
   }
 
   *write(time: number, timingFunction?: TimingFunction) {
@@ -91,13 +95,19 @@ export class Pitex extends Latex {
     for (let i = 0; i < paths.length; i++) {
       paths[i].stroke(this.fill())
 
+      if (isPath(paths[i]) && isPath(targets[i]))
+        animations.push(
+          delay(
+            time * buffer,
+            (paths[i] as Path).data(
+              (targets[i] as Path).data(),
+              time * (1 - 2 * buffer)
+            )
+          )
+        )
       animations.push(
         paths[i].fill(null, time * buffer),
         paths[i].lineWidth(40, time * buffer),
-        delay(
-          time * buffer,
-          paths[i].data(targets[i].data(), time * (1 - 2 * buffer))
-        ),
         delay(
           time * buffer,
           paths[i].position(targets[i].position(), time * (1 - 2 * buffer))
@@ -125,10 +135,7 @@ export class Pitex extends Latex {
     for (let i = 0; i < len; i++) {
       if (!mapping[i].length) {
         animations.push(
-          delay(
-            time * buffer,
-            paths[i].opacity(0, time * (1 - 2 * buffer))
-          )
+          delay(time * buffer, paths[i].opacity(0, time * (1 - 2 * buffer)))
         )
         extras.push(i)
         continue
@@ -149,14 +156,17 @@ export class Pitex extends Latex {
 
         paths = this.getPaths()
 
-        animations.push(
-          delay(
-            time * buffer,
-            paths[index].data(
-              targets[mapping[i][j]].data(),
-              time * (1 - 2 * buffer)
+        if (isPath(paths[i]) && isPath(targets[mapping[i][j]]))
+          animations.push(
+            delay(
+              time * buffer,
+              (paths[index] as Path).data(
+                (targets[mapping[i][j]] as Path).data(),
+                time * (1 - 2 * buffer)
+              )
             )
-          ),
+          )
+        animations.push(
           delay(
             time * buffer,
             paths[index].position(
