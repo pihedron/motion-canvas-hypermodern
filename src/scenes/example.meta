@@ -1,18 +1,5 @@
 {
   "version": 0,
-  "timeEvents": [
-    {
-      "name": "problem",
-      "targetTime": 3.6738906127448687
-    },
-    {
-      "name": "forming",
-      "targetTime": 5.262357860002063
-    },
-    {
-      "name": "you",
-      "targetTime": 14.730310700302173
-    }
-  ],
+  "timeEvents": [],
   "seed": 3331744959
 }

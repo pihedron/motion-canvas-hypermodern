@@ -406,8 +406,8 @@ export default makeScene2D(function* (view) {
 
   ptx[0].position([260, 240]).opacity(1)
   ptx[1].position([-50, 10]).opacity(1)
-  ptx[2].position([-450, -60]).opacity(1).tex('c_1^2')
-  ptx[3].position([280, -60]).opacity(1).tex('c_2^2')
+  ptx[2].position([-450, -60]).opacity(1).tex('c_1')
+  ptx[3].position([280, -60]).opacity(1).tex('c_2')
   ptx[4].position([-80, 150]).opacity(1)
 
   yield* all(
